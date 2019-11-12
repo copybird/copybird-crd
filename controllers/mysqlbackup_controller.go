@@ -108,7 +108,11 @@ func (r *MysqlBackupReconciler) reconcile(ctx context.Context, backup *backupv1a
 	cronjob, err := r.getOwnedCronjob(ctx, backup)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			cronjob = resources.MakeCronJob(backup, r.CopyBirdImage)
+			env, err := r.CopyBirdEnv(ctx, backup)
+			if err != nil {
+				return err
+			}
+			cronjob = resources.MakeCronJob(backup, r.CopyBirdImage, env)
 			if err = controllerutil.SetControllerReference(backup, cronjob, r.Scheme); err != nil {
 				return err
 			}
@@ -156,8 +160,37 @@ func (r *MysqlBackupReconciler) secretFrom(ctx context.Context, namespace string
 	return string(secretVal), nil
 }
 
-func (r *MysqlBackupReconciler) ConstructArguments(ctx context.Context, backup *backupv1alpha1.MysqlBackup) error {
-	return nil
+func (r *MysqlBackupReconciler) CopyBirdEnv(ctx context.Context, backup *backupv1alpha1.MysqlBackup) ([]corev1.EnvVar, error) {
+	var env []corev1.EnvVar
+	mysqlUser, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Database.User.SecretKeyRef)
+	if err != nil {
+		return env, err
+	}
+	mysqlPassword, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Database.Password.SecretKeyRef)
+	if err != nil {
+		return env, err
+	}
+	encryptionKey, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Encryption.Key.SecretKeyRef)
+	if err != nil {
+		return env, err
+	}
+
+	env = []corev1.EnvVar{
+		{
+			Name:  "MYSQL_DSN",
+			Value: fmt.Sprintf("mysql::dsn=%s:%s@tcp(%s)/%s", mysqlUser, mysqlPassword, backup.Spec.Database.Host, backup.Spec.Database.Name),
+		}, {
+			Name:  "DUMP_PATH",
+			Value: fmt.Sprintf("local::file=dump.sql"),
+		}, {
+			Name:  "COMPRESSION",
+			Value: fmt.Sprintf("gzip::level=%d", backup.Spec.CompressionLevel),
+		}, {
+			Name:  "ENCRYPTION",
+			Value: fmt.Sprintf("aesgcm::key=%s", encryptionKey),
+		},
+	}
+	return env, nil
 }
 
 func (r *MysqlBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {

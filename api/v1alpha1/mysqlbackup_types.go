@@ -34,11 +34,12 @@ type MysqlBackup struct {
 
 // MysqlBackupSpec defines the desired state of MysqlBackup
 type MysqlBackupSpec struct {
-	Schedule         string        `json:"schedule,omitempty"`
-	StorePeriod      string        `json:"storeperiod,omitempty"`
-	CompressionLevel int           `json:"compressionLevel,omitempty"`
-	Database         MysqlDatabase `json:"database,omitempty"`
-	Storage          BackupStorage `json:"storage,omitempty"`
+	Schedule         string           `json:"schedule,omitempty"`
+	StorePeriod      string           `json:"storeperiod,omitempty"`
+	CompressionLevel int              `json:"compressionLevel,omitempty"`
+	Database         MysqlDatabase    `json:"database,omitempty"`
+	Storage          BackupStorage    `json:"storage,omitempty"`
+	Encryption       BackupEncryption `json:"encryption,omitempty"`
 }
 
 // MysqlDatabase contains Mysql database host address, db name and access credentials

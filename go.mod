@@ -6,6 +6,7 @@ require (
 	github.com/copybird/copybird v0.0.0-20190723053855-e1eb5118b1cb
 	github.com/go-logr/logr v0.1.0
 	github.com/go-sql-driver/mysql v1.4.1
+	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
 	github.com/pierrec/lz4 v2.0.5+incompatible

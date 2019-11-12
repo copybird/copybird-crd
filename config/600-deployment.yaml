@@ -16,14 +16,12 @@ spec:
         control-plane: controller-manager
     spec:
       containers:
-      - command:
-        - /manager
+      - name: manager
         env:
         - name: COPYBIRD_IMAGE
-          value: copybird/copybird:latest
-          # value: github.com/tzununbekov/copybird-crd/cmd/copybird
+          # value: copybird/copybird:latest
+          value: github.com/tzununbekov/copybird-crd/cmd/copybird-api
         image: github.com/tzununbekov/copybird-crd/cmd/controller
-        name: manager
         resources:
           limits:
             cpu: 100m

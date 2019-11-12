@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func MakeCronJob(backup *backupv1alpha1.MysqlBackup, copybirdImage string) *v1beta1.CronJob {
+func MakeCronJob(backup *backupv1alpha1.MysqlBackup, copybirdImage string, copybirdEnv []corev1.EnvVar) *v1beta1.CronJob {
 	return &v1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backup.Name,
@@ -35,8 +35,7 @@ func MakeCronJob(backup *backupv1alpha1.MysqlBackup, copybirdImage string) *v1be
 								corev1.Container{
 									Name:  backup.Name,
 									Image: copybirdImage,
-									// Command: []string{backup.Spec.Type},
-									// Args:    backup.ConstrucArguments(),
+									Env:   copybirdEnv,
 								},
 							},
 						},
