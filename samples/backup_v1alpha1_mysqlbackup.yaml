@@ -1,0 +1,38 @@
+apiVersion: copybird.org/v1alpha1
+kind: MysqlBackup
+metadata:
+  name: mysqlbackup-sample
+spec:
+  schedule: "* */1 * * *"
+  storeperiod: "1 month"
+  compressionlevel: 2 
+  database:
+    host: "mysql:3306"
+    name: "foo"
+    user:
+      secretKeyRef:
+        name: mysqlsecret
+        key: user
+    password:
+      secretKeyRef:
+        name: mysqlsecret
+        key: password
+  storage:
+    type: s3
+    region: "us-west-1"
+    accesskey:
+      secretKeyRef:
+        name: awssecret
+        key: accesskey
+    secretkey:
+      secretKeyRef:
+        name: awssecret
+        key: secretkey
+  encryption:
+    # algorithm: 
+    key:
+      secretKeyRef:
+        name: copybirdsecret
+        key: encryptionkey
+  # notifier:
+    # - type: stdout

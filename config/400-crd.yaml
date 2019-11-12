@@ -1,0 +1,171 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.2
+  creationTimestamp: null
+  name: mysqlbackups.copybird.org
+spec:
+  group: copybird.org
+  names:
+    kind: MysqlBackup
+    listKind: MysqlBackupList
+    plural: mysqlbackups
+    singular: mysqlbackup
+  scope: ""
+  validation:
+    openAPIV3Schema:
+      description: MysqlBackup is the Schema for the mysqlbackups API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: MysqlBackupSpec defines the desired state of MysqlBackup
+          properties:
+            compressionLevel:
+              type: integer
+            database:
+              description: MysqlDatabase contains Mysql database host address, db
+                name and access credentials
+              properties:
+                host:
+                  type: string
+                name:
+                  type: string
+                password:
+                  description: SecretValueFromSource is a reference to Core secret
+                    object with key selector
+                  properties:
+                    secretKeyRef:
+                      description: SecretKeySelector selects a key of a Secret.
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                  type: object
+                user:
+                  description: SecretValueFromSource is a reference to Core secret
+                    object with key selector
+                  properties:
+                    secretKeyRef:
+                      description: SecretKeySelector selects a key of a Secret.
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                  type: object
+              type: object
+            schedule:
+              type: string
+            storage:
+              description: BackupStorage defines storage target where to store backup
+                archives
+              properties:
+                accessKey:
+                  description: SecretValueFromSource is a reference to Core secret
+                    object with key selector
+                  properties:
+                    secretKeyRef:
+                      description: SecretKeySelector selects a key of a Secret.
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                  type: object
+                region:
+                  type: string
+                secretKey:
+                  description: SecretValueFromSource is a reference to Core secret
+                    object with key selector
+                  properties:
+                    secretKeyRef:
+                      description: SecretKeySelector selects a key of a Secret.
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                  type: object
+                type:
+                  type: string
+              type: object
+            storeperiod:
+              type: string
+          type: object
+        status:
+          description: MysqlBackupStatus defines the observed state of MysqlBackup
+          properties:
+            latestBackupHash:
+              type: string
+            latestBackupTimestamp:
+              type: string
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
