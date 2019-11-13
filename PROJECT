@@ -4,4 +4,4 @@ repo: github.com/tzununbekov/copybird-crd
 resources:
 - group: backup
   version: v1alpha1
-  kind: MysqlBackup
+  kind: Backup

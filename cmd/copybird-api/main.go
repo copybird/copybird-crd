@@ -12,52 +12,57 @@ import (
 	"time"
 
 	"github.com/copybird/copybird/core"
+	"github.com/copybird/copybird/modules/backup/compress/gzip"
+	"github.com/copybird/copybird/modules/backup/compress/lz4"
+	"github.com/copybird/copybird/modules/backup/encrypt/aesgcm"
+	"github.com/copybird/copybird/modules/backup/input/mongodb"
+	"github.com/copybird/copybird/modules/backup/input/mysql"
+	postgres "github.com/copybird/copybird/modules/backup/input/postgresql"
+	"github.com/copybird/copybird/modules/backup/output/gcp"
+	"github.com/copybird/copybird/modules/backup/output/http"
+	"github.com/copybird/copybird/modules/backup/output/local"
+	"github.com/copybird/copybird/modules/backup/output/s3"
+	"github.com/copybird/copybird/modules/backup/output/scp"
 	"github.com/iancoleman/strcase"
 )
 
 const (
-	envMysqlDSN    = "MYSQL_DSN"
-	envDumpPath    = "DUMP_PATH"
+	envInput       = "INPUT"
+	envOutput      = "OUTPUT"
 	envCompression = "COMPRESSION"
 	envEncryption  = "ENCRYPTION"
 )
 
+func init() {
+	core.RegisterModule(&mysql.BackupInputMysql{})
+	core.RegisterModule(&postgres.BackupInputPostgresql{})
+	core.RegisterModule(&mongodb.BackupInputMongodb{})
+	core.RegisterModule(&gzip.BackupCompressGzip{})
+	core.RegisterModule(&lz4.BackupCompressLz4{})
+	core.RegisterModule(&aesgcm.BackupEncryptAesgcm{})
+	core.RegisterModule(&gcp.BackupOutputGcp{})
+	core.RegisterModule(&http.BackupOutputHttp{})
+	core.RegisterModule(&local.BackupOutputLocal{})
+	core.RegisterModule(&s3.BackupOutputS3{})
+	core.RegisterModule(&scp.BackupOutputScp{})
+}
+
 func main() {
-	mysqlDSN, defined := os.LookupEnv(envMysqlDSN)
+	input, defined := os.LookupEnv(envInput)
 	if !defined {
-		log.Fatalf("environment variable %q not defined", envMysqlDSN)
+		log.Fatalf("environment variable %q not defined", envInput)
 	}
 
-	dumpPath, defined := os.LookupEnv(envDumpPath)
+	output, defined := os.LookupEnv(envOutput)
 	if !defined {
-		log.Fatalf("environment variable %q not defined", envDumpPath)
+		log.Fatalf("environment variable %q not defined", envOutput)
 	}
 
-	compression, defined := os.LookupEnv(envCompression)
-	if !defined {
-		log.Fatalf("environment variable %q not defined", envCompression)
-	}
-
-	encryption, defined := os.LookupEnv(envEncryption)
-	if !defined {
-		log.Fatalf("environment variable %q not defined", envEncryption)
-	}
-
-	mInput, err := loadModule(core.ModuleGroupBackup, core.ModuleTypeInput, mysqlDSN)
+	mInput, err := loadModule(core.ModuleGroupBackup, core.ModuleTypeInput, input)
 	if err != nil {
 		log.Panic(err)
 	}
-	mOutput, err := loadModule(core.ModuleGroupBackup, core.ModuleTypeOutput, dumpPath)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	mCompress, err := loadModule(core.ModuleGroupBackup, core.ModuleTypeCompress, compression)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	mEncrypt, err := loadModule(core.ModuleGroupBackup, core.ModuleTypeEncrypt, encryption)
+	mOutput, err := loadModule(core.ModuleGroupBackup, core.ModuleTypeOutput, output)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -68,21 +73,34 @@ func main() {
 	nextReader, nextWriter := io.Pipe()
 
 	go runModule(mInput, nextWriter, nil, &wg)
-	_nextReader, _nextWriter := io.Pipe()
-	wg.Add(1)
-	go runModule(mCompress, _nextWriter, nextReader, &wg)
-	nextReader = _nextReader
 
-	_nextReader, _nextWriter = io.Pipe()
-	wg.Add(1)
-	go runModule(mEncrypt, _nextWriter, nextReader, &wg)
-	nextReader = _nextReader
+	compression, defined := os.LookupEnv(envCompression)
+	if defined && compression != "" {
+		mCompress, err := loadModule(core.ModuleGroupBackup, core.ModuleTypeCompress, compression)
+		if err != nil {
+			log.Panic(err)
+		}
+		_nextReader, _nextWriter := io.Pipe()
+		wg.Add(1)
+		go runModule(mCompress, _nextWriter, nextReader, &wg)
+		nextReader = _nextReader
+	}
+
+	encryption, defined := os.LookupEnv(envEncryption)
+	if defined && encryption != "" {
+		mEncrypt, err := loadModule(core.ModuleGroupBackup, core.ModuleTypeEncrypt, encryption)
+		if err != nil {
+			log.Panic(err)
+		}
+		_nextReader, _nextWriter := io.Pipe()
+		wg.Add(1)
+		go runModule(mEncrypt, _nextWriter, nextReader, &wg)
+		nextReader = _nextReader
+	}
 
 	go runModule(mOutput, nil, nextReader, &wg)
 
 	wg.Wait()
-
-	log.Println("Mysql backup complete")
 }
 
 func loadModule(mGroup core.ModuleGroup, mType core.ModuleType, args string) (core.Module, error) {

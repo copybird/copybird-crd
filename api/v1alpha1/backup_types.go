@@ -23,27 +23,28 @@ import (
 
 // +kubebuilder:object:root=true
 
-// MysqlBackup is the Schema for the mysqlbackups API
-type MysqlBackup struct {
+// Backup is the Schema for the backups API
+type Backup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MysqlBackupSpec   `json:"spec,omitempty"`
-	Status MysqlBackupStatus `json:"status,omitempty"`
+	Spec   BackupSpec   `json:"spec,omitempty"`
+	Status BackupStatus `json:"status,omitempty"`
 }
 
-// MysqlBackupSpec defines the desired state of MysqlBackup
-type MysqlBackupSpec struct {
+// BackupSpec defines the desired state of Backup
+type BackupSpec struct {
 	Schedule         string           `json:"schedule,omitempty"`
 	StorePeriod      string           `json:"storeperiod,omitempty"`
-	CompressionLevel int              `json:"compressionLevel,omitempty"`
-	Database         MysqlDatabase    `json:"database,omitempty"`
+	CompressionLevel int              `json:"compressionlevel,omitempty"`
+	Database         Database         `json:"database,omitempty"`
 	Storage          BackupStorage    `json:"storage,omitempty"`
 	Encryption       BackupEncryption `json:"encryption,omitempty"`
 }
 
-// MysqlDatabase contains Mysql database host address, db name and access credentials
-type MysqlDatabase struct {
+// Database contains  database host address, db name and access credentials
+type Database struct {
+	Type     string                `json:"type,omitempty"`
 	Host     string                `json:"host,omitempty"`
 	Name     string                `json:"name,omitempty"`
 	User     SecretValueFromSource `json:"user,omitempty"`
@@ -54,14 +55,15 @@ type MysqlDatabase struct {
 type BackupStorage struct {
 	Type      string                `json:"type,omitempty"`
 	Region    string                `json:"region,omitempty"`
-	AccessKey SecretValueFromSource `json:"accessKey,omitempty"`
-	SecretKey SecretValueFromSource `json:"secretKey,omitempty"`
+	Bucket    string                `json:"bucket,omitempty"`
+	AccessKey SecretValueFromSource `json:"accesskey,omitempty"`
+	SecretKey SecretValueFromSource `json:"secretkey,omitempty"`
 }
 
 // BackupEncryption contains backup archive encryption parameters
 type BackupEncryption struct {
-	Algorithm string                `json:"algorithm,omitempty"`
-	Key       SecretValueFromSource `json:"key,omitempty"`
+	Type string                `json:"type,omitempty"`
+	Key  SecretValueFromSource `json:"key,omitempty"`
 }
 
 // SecretValueFromSource is a reference to Core secret object with key selector
@@ -69,21 +71,34 @@ type SecretValueFromSource struct {
 	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 }
 
-// MysqlBackupStatus defines the observed state of MysqlBackup
-type MysqlBackupStatus struct {
-	LatestBackupHash      string `json:"latestBackupHash,omitempty"`
-	LatestBackupTimestamp string `json:"latestBackupTimestamp,omitempty"`
+// BackupStatus defines the observed state of Backup
+type BackupStatus struct {
+	LatestBackupHash         string       `json:"latestBackupHash,omitempty"`
+	LatestBackupTimestamp    string       `json:"latestBackupTimestamp,omitempty"`
+	EncryptionSecretProvided bool         `json:"encryptionSecretProvided"`
+	Input                    InputStatus  `json:"input"`
+	Output                   OutputStatus `json:"output"`
+}
+
+// InputStatus represents statuses of backup input component
+type InputStatus struct {
+	SecretProvided bool `json:"inputSecretProvided"`
+}
+
+// OutputStatus represents statuses of backup output component
+type OutputStatus struct {
+	SecretProvided bool `json:"OutputSecretProvided"`
 }
 
 // +kubebuilder:object:root=true
 
-// MysqlBackupList contains a list of MysqlBackup
-type MysqlBackupList struct {
+// BackupList contains a list of Backup
+type BackupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MysqlBackup `json:"items"`
+	Items           []Backup `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&MysqlBackup{}, &MysqlBackupList{})
+	SchemeBuilder.Register(&Backup{}, &BackupList{})
 }

@@ -25,14 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/klog"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
-)
-
-const (
-	copybirdImageEnvVar  = "COPYBIRD_IMAGE"
-	copybirdDefaultImage = "copybird/copybird:latest"
 )
 
 var (
@@ -42,7 +38,6 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
-
 	_ = backupv1alpha1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
@@ -57,11 +52,7 @@ func main() {
 		o.Development = true
 	}))
 
-	copybirdImage, defined := os.LookupEnv(copybirdImageEnvVar)
-	if !defined {
-		setupLog.Info("environment variable \"" + copybirdImageEnvVar + "\" not defined, using default value: \"" + copybirdDefaultImage)
-		copybirdImage = copybirdDefaultImage
-	}
+	klog.InitFlags(nil)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
@@ -73,13 +64,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.MysqlBackupReconciler{
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("MysqlBackup"),
-		Scheme:        mgr.GetScheme(),
-		CopyBirdImage: copybirdImage,
+	if err = (&controllers.BackupReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("Backup"),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MysqlBackup")
+		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

@@ -7,7 +7,7 @@ rules:
 - apiGroups:
   - copybird.org
   resources:
-  - mysqlbackups
+  - backups
   verbs:
   - create
   - delete
@@ -19,7 +19,7 @@ rules:
 - apiGroups:
   - copybird.org
   resources:
-  - mysqlbackups/status
+  - backups/status
   verbs:
   - get
   - patch
@@ -35,4 +35,12 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
   - watch

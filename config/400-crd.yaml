@@ -4,18 +4,18 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.2
   creationTimestamp: null
-  name: mysqlbackups.copybird.org
+  name: backups.copybird.org
 spec:
   group: copybird.org
   names:
-    kind: MysqlBackup
-    listKind: MysqlBackupList
-    plural: mysqlbackups
-    singular: mysqlbackup
+    kind: Backup
+    listKind: BackupList
+    plural: backups
+    singular: backup
   scope: ""
   validation:
     openAPIV3Schema:
-      description: MysqlBackup is the Schema for the mysqlbackups API
+      description: Backup is the Schema for the backups API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -30,12 +30,12 @@ spec:
         metadata:
           type: object
         spec:
-          description: MysqlBackupSpec defines the desired state of MysqlBackup
+          description: BackupSpec defines the desired state of Backup
           properties:
             compressionLevel:
               type: integer
             database:
-              description: MysqlDatabase contains Mysql database host address, db
+              description: Database contains  database host address, db
                 name and access credentials
               properties:
                 host:
@@ -150,7 +150,7 @@ spec:
               type: string
           type: object
         status:
-          description: MysqlBackupStatus defines the observed state of MysqlBackup
+          description: BackupStatus defines the observed state of Backup
           properties:
             latestBackupHash:
               type: string

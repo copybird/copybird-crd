@@ -19,15 +19,14 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/go-logr/logr"
 	backupv1alpha1 "github.com/tzununbekov/copybird-crd/api/v1alpha1"
 	"github.com/tzununbekov/copybird-crd/controllers/resources"
-	"k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,27 +35,27 @@ import (
 )
 
 const (
-	controllerAgentName = "copybird-backup-controller"
-	finalizerName       = controllerAgentName
+	finalizerName        = "copybird-backup-controller"
+	copybirdImageEnvVar  = "COPYBIRD_IMAGE"
+	copybirdDefaultImage = "copybird/copybird:latest"
 )
 
-// MysqlBackupReconciler reconciles a MysqlBackup object
-type MysqlBackupReconciler struct {
+// BackupReconciler reconciles a Backup object
+type BackupReconciler struct {
 	client.Client
-	Log           logr.Logger
-	Scheme        *runtime.Scheme
-	CopyBirdImage string
+	Log    logr.Logger
+	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=copybird.org,resources=mysqlbackups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=copybird.org,resources=mysqlbackups/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=copybird.org,resources=backups,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=copybird.org,resources=backups/status,verbs=get;update;patch
 
 // Reconcile implements controllbackup.Nameer reconcilation logic
-func (r *MysqlBackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *BackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithValues("mysqlbackup", req.NamespacedName)
+	log := r.Log.WithValues("backup", req.NamespacedName)
 
-	backup := &backupv1alpha1.MysqlBackup{}
+	backup := &backupv1alpha1.Backup{}
 	result := ctrl.Result{
 		Requeue: false,
 	}
@@ -81,13 +80,12 @@ func (r *MysqlBackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		reconcileErr = r.reconcile(ctx, backup)
 	} else {
 		reconcileErr = r.finalize(ctx, backup)
-		result.Requeue = true
 	}
 
 	if reconcileErr != nil {
-		log.Error(err, "Reconcilation failed")
 		result.Requeue = true
-		return result, err
+		log.Error(reconcileErr, "reconcilation error")
+		// return result, err
 	}
 
 	if err := r.Update(context.Background(), backup); err != nil {
@@ -98,47 +96,79 @@ func (r *MysqlBackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	return result, nil
 }
 
-func (r *MysqlBackupReconciler) reconcile(ctx context.Context, backup *backupv1alpha1.MysqlBackup) error {
+func (r *BackupReconciler) reconcile(ctx context.Context, backup *backupv1alpha1.Backup) error {
 	log := r.Log.WithName("reconciler")
-	_ = log
 	if len(backup.GetFinalizers()) == 0 {
 		backup.Finalizers = []string{finalizerName}
 	}
 
-	cronjob, err := r.getOwnedCronjob(ctx, backup)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			env, err := r.CopyBirdEnv(ctx, backup)
-			if err != nil {
-				return err
-			}
-			cronjob = resources.MakeCronJob(backup, r.CopyBirdImage, env)
+	copybirdImage, defined := os.LookupEnv(copybirdImageEnvVar)
+	if !defined {
+		log.Info("environment variable \"" + copybirdImageEnvVar + "\" not defined, using default value: \"" + copybirdDefaultImage)
+		copybirdImage = copybirdDefaultImage
+	}
+
+	backup.Status.Input.SecretProvided = true
+	backup.Status.Output.SecretProvided = true
+	backup.Status.EncryptionSecretProvided = true
+	backup.Status.LatestBackupHash = "unknown"
+
+	inputUser, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Database.User.SecretKeyRef)
+	if inputUser == "" || err != nil {
+		backup.Status.Input.SecretProvided = false
+	}
+	inputPassword, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Database.Password.SecretKeyRef)
+	if inputPassword == "" || err != nil {
+		backup.Status.Input.SecretProvided = false
+	}
+	outputAccessKey, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Storage.AccessKey.SecretKeyRef)
+	if outputAccessKey == "" || err != nil {
+		backup.Status.Output.SecretProvided = false
+	}
+	outputSecretKey, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Storage.SecretKey.SecretKeyRef)
+	if outputSecretKey == "" || err != nil {
+		backup.Status.Output.SecretProvided = false
+	}
+	encryptionKey, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Encryption.Key.SecretKeyRef)
+	if encryptionKey == "" || err != nil {
+		backup.Status.EncryptionSecretProvided = false
+	}
+
+	input := r.composeInput(backup.Spec.Database, inputUser, inputPassword)
+	encryption := r.composeEncryption(encryptionKey)
+	compression := r.composeCompression(backup.Spec.CompressionLevel)
+	output := r.composeOutput(backup.Spec.Storage, outputAccessKey, outputSecretKey)
+
+	copybird := resources.NewCopyBirdParams(
+		backup.Name,
+		backup.Namespace,
+		copybirdImage,
+		backup.Spec.Schedule,
+		input,
+		compression,
+		encryption,
+		output,
+	)
+
+	cronjob := copybird.MakeCronJob(ctx)
+
+	controllerutil.CreateOrUpdate(ctx, r.Client, cronjob, func() error {
+		if cronjob.ObjectMeta.CreationTimestamp.IsZero() {
 			if err = controllerutil.SetControllerReference(backup, cronjob, r.Scheme); err != nil {
 				return err
 			}
-			if err = r.Create(ctx, cronjob); err != nil {
-				return err
-			}
-			return nil
 		}
+		return nil
+	})
+	if err = r.Update(ctx, cronjob); err != nil {
+		log.Error(err, "Cronjob update failed")
+		return err
 	}
 
 	return nil
 }
 
-func (r *MysqlBackupReconciler) getOwnedCronjob(ctx context.Context, backup *backupv1alpha1.MysqlBackup) (*v1beta1.CronJob, error) {
-	cronjob := &v1beta1.CronJob{}
-	err := r.Get(ctx, client.ObjectKey{Namespace: backup.Namespace, Name: backup.Name}, cronjob)
-	if err != nil {
-		return nil, err
-	}
-	if metav1.IsControlledBy(cronjob, backup) {
-		return cronjob, nil
-	}
-	return nil, apierrors.NewNotFound(v1beta1.Resource("cronjob"), "")
-}
-
-func (r *MysqlBackupReconciler) finalize(ctx context.Context, backup *backupv1alpha1.MysqlBackup) error {
+func (r *BackupReconciler) finalize(ctx context.Context, backup *backupv1alpha1.Backup) error {
 	log := r.Log.WithName("finalizer")
 	_ = log
 	finalizers := sets.NewString(backup.Finalizers...)
@@ -147,7 +177,10 @@ func (r *MysqlBackupReconciler) finalize(ctx context.Context, backup *backupv1al
 	return nil
 }
 
-func (r *MysqlBackupReconciler) secretFrom(ctx context.Context, namespace string, secretKeySelector *corev1.SecretKeySelector) (string, error) {
+func (r *BackupReconciler) secretFrom(ctx context.Context, namespace string, secretKeySelector *corev1.SecretKeySelector) (string, error) {
+	if secretKeySelector == nil {
+		return "", nil
+	}
 	secret := &corev1.Secret{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretKeySelector.Name}, secret)
 	if err != nil {
@@ -160,41 +193,31 @@ func (r *MysqlBackupReconciler) secretFrom(ctx context.Context, namespace string
 	return string(secretVal), nil
 }
 
-func (r *MysqlBackupReconciler) CopyBirdEnv(ctx context.Context, backup *backupv1alpha1.MysqlBackup) ([]corev1.EnvVar, error) {
-	var env []corev1.EnvVar
-	mysqlUser, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Database.User.SecretKeyRef)
-	if err != nil {
-		return env, err
-	}
-	mysqlPassword, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Database.Password.SecretKeyRef)
-	if err != nil {
-		return env, err
-	}
-	encryptionKey, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Encryption.Key.SecretKeyRef)
-	if err != nil {
-		return env, err
-	}
-
-	env = []corev1.EnvVar{
-		{
-			Name:  "MYSQL_DSN",
-			Value: fmt.Sprintf("mysql::dsn=%s:%s@tcp(%s)/%s", mysqlUser, mysqlPassword, backup.Spec.Database.Host, backup.Spec.Database.Name),
-		}, {
-			Name:  "DUMP_PATH",
-			Value: fmt.Sprintf("local::file=dump.sql"),
-		}, {
-			Name:  "COMPRESSION",
-			Value: fmt.Sprintf("gzip::level=%d", backup.Spec.CompressionLevel),
-		}, {
-			Name:  "ENCRYPTION",
-			Value: fmt.Sprintf("aesgcm::key=%s", encryptionKey),
-		},
-	}
-	return env, nil
+func (r *BackupReconciler) composeInput(db backupv1alpha1.Database, user, password string) string {
+	return fmt.Sprintf("%s::dsn=%s:%s@tcp(%s)/%s", db.Type, user, password, db.Host, db.Name)
 }
 
-func (r *MysqlBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *BackupReconciler) composeOutput(storage backupv1alpha1.BackupStorage, accessKey, secretKey string) string {
+	return fmt.Sprintf("%s::region=%s::access_key_id=%s::secret_access_key=%s::bucket=%s::file_name=%s",
+		storage.Type, storage.Region, accessKey, secretKey, storage.Bucket, "dump.sql")
+}
+
+func (r *BackupReconciler) composeCompression(compressionLevel int) string {
+	if compressionLevel == 0 {
+		return ""
+	}
+	return fmt.Sprintf("gzip::level=%d", compressionLevel)
+}
+
+func (r *BackupReconciler) composeEncryption(encryptionKey string) string {
+	if encryptionKey == "" {
+		return ""
+	}
+	return fmt.Sprintf("aesgcm::key=%s", encryptionKey)
+}
+
+func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&backupv1alpha1.MysqlBackup{}).
+		For(&backupv1alpha1.Backup{}).
 		Complete(r)
 }
