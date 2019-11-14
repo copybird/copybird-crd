@@ -25,9 +25,11 @@ import (
 	"github.com/go-logr/logr"
 	backupv1alpha1 "github.com/tzununbekov/copybird-crd/api/v1alpha1"
 	"github.com/tzununbekov/copybird-crd/controllers/resources"
+	"k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -91,11 +93,6 @@ func (r *BackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		// return result, err
 	}
 
-	if err := r.Update(context.Background(), backup); err != nil {
-		log.Error(err, "Failed to update object")
-		return result, err
-	}
-
 	return result, nil
 }
 
@@ -154,21 +151,35 @@ func (r *BackupReconciler) reconcile(ctx context.Context, backup *backupv1alpha1
 		output,
 	)
 
-	cronjob := copybird.MakeCronJob(ctx)
+	cronjob := &v1beta1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backup.Name,
+			Namespace: backup.Namespace,
+		},
+	}
 
-	controllerutil.CreateOrUpdate(ctx, r.Client, cronjob, func() error {
+	err = r.Get(ctx, client.ObjectKey{Namespace: cronjob.Namespace, Name: cronjob.Name}, cronjob)
+	if apierrors.IsNotFound(err) {
+		cronjob = copybird.MakeCronJob(ctx)
+	} else if err != nil {
+		return err
+	}
+
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, cronjob, func() error {
 		if cronjob.ObjectMeta.CreationTimestamp.IsZero() {
 			if err = controllerutil.SetControllerReference(backup, cronjob, r.Scheme); err != nil {
 				return err
 			}
+		} else {
+			newCronjob := copybird.MakeCronJob(ctx)
+			cronjob.Spec = newCronjob.Spec
 		}
 		return nil
 	})
-	if err = r.Update(ctx, cronjob); err != nil {
-		log.Error(err, "Cronjob update failed")
+	if err != nil {
 		return err
 	}
-
+	log.Info("Cronjob successfully reconciled", "operation", op)
 	return nil
 }
 
