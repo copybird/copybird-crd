@@ -5,7 +5,7 @@ metadata:
 spec:
   schedule: "*/1 * * * *"
   storeperiod: "1 month"
-  compressionlevel: 0
+  compressionlevel: 2
   database:
     type: "mysql"
     host: "mysql:3306"
@@ -30,11 +30,11 @@ spec:
       secretKeyRef:
         name: awssecret
         key: secretkey
-  # encryption:
-    # type: "" 
-    # key:
-      # secretKeyRef:
-        # name: copybirdsecret
-        # key: encryptionkey
+  encryption:
+    type: "aesgcm" 
+    key:
+      secretKeyRef:
+        name: copybirdsecret
+        key: encryptionkey
   # notifier:
     # - type: stdout
