@@ -20,8 +20,8 @@ spec:
         env:
         - name: COPYBIRD_IMAGE
           # value: copybird/copybird:latest
-          value: github.com/tzununbekov/copybird-crd/cmd/copybird-api
-        image: github.com/tzununbekov/copybird-crd/cmd/controller
+          value: github.com/copybird/copybird-crd/cmd/copybird-api
+        image: github.com/copybird/copybird-crd/cmd/controller
         resources:
           limits:
             cpu: 100m

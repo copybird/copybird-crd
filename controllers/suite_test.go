@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	backupv1alpha1 "github.com/tzununbekov/copybird-crd/api/v1alpha1"
+	backupv1alpha1 "github.com/copybird/copybird-crd/api/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"

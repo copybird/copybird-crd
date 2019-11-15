@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	backupv1alpha1 "github.com/tzununbekov/copybird-crd/api/v1alpha1"
-	"github.com/tzununbekov/copybird-crd/controllers/resources"
+	backupv1alpha1 "github.com/copybird/copybird-crd/api/v1alpha1"
+	"github.com/copybird/copybird-crd/controllers/resources"
 	"k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

@@ -1,4 +1,4 @@
-module github.com/tzununbekov/copybird-crd
+module github.com/copybird/copybird-crd
 
 go 1.12
 

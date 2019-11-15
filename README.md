@@ -2,7 +2,7 @@
 
 PoC, WiP
 
-This repository contains custom resource definition, controller and [copybird](https://github.com/copybird/copybird) components to create and run `Backup` objects in Kubernetes. Sample backup object available in [sample](https://github.com/tzununbekov/copybird-crd/tree/master/samples) directory as well as test mysql pod and service yamls. Most convenient way to build and deploy this CRD is to use [ko](https://github.com/google/ko) tool which may be installed by running:
+This repository contains custom resource definition, controller and [copybird](https://github.com/copybird/copybird) components to create and run `Backup` objects in Kubernetes. Sample backup object available in [sample](https://github.com/copybird/copybird-crd/tree/master/samples) directory as well as test mysql pod and service yamls. Most convenient way to build and deploy this CRD is to use [ko](https://github.com/google/ko) tool which may be installed by running:
 
 ```   
 GO111MODULE=on go get github.com/google/ko/cmd/ko

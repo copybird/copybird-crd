@@ -1,6 +1,6 @@
 version: "2"
 domain: copybird.org
-repo: github.com/tzununbekov/copybird-crd
+repo: github.com/copybird/copybird-crd
 resources:
 - group: backup
   version: v1alpha1
