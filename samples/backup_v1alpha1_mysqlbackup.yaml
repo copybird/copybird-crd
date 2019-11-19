@@ -4,37 +4,50 @@ metadata:
   name: mysqlbackup-sample
 spec:
   schedule: "*/1 * * * *"
-  storeperiod: "1 month"
-  compressionlevel: 2
-  database:
+  input:
+    # type: "mysqldump"
+    # params:
+    # - key: "host"
+    #   value: "mysql"
+    # - key: "port"
+    #   value: "3306"
+    # - key: "db"
+    #   value: "foo"
+    # secrets:
+    # - secretKeyRef:
+    #     name: mysqlsecret
+    #     key: user
+    # - secretKeyRef:
+    #     name: mysqlsecret
+    #     key: password
     type: "mysql"
-    host: "mysql:3306"
-    name: "foo"
-    user:
-      secretKeyRef:
-        name: mysqlsecret
-        key: user
-    password:
-      secretKeyRef:
-        name: mysqlsecret
-        key: password
-  storage:
-    type: s3
-    region: "eu-central-1"
-    bucket: "tzununbekov-copybird-backups"
-    accesskey:
-      secretKeyRef:
+    params:
+    - key: "dsn"
+      value: "root:root@tcp(mysql:3306)/foo"
+  compress:
+    type: "gzip"
+    params:
+    - key: "compressionlevel"
+      value: "2"
+  # encrypt:
+    # type: "aesgcm" 
+    # secrets:
+    # - secretKeyRef:
+        # name: copybirdsecret
+        # key: encryptionkey
+  output:
+    type: "s3"
+    params:
+    - key: filename
+      value: dump.sql
+    - key: "region"
+      value: "eu-central-1"
+    - key: "bucket"
+      value: "tzununbekov-copybird-backups"
+    secrets:
+    - secretKeyRef:
         name: awssecret
-        key: accesskey
-    secretkey:
-      secretKeyRef:
+        key: accesskeyid
+    - secretKeyRef:
         name: awssecret
-        key: secretkey
-  encryption:
-    type: "aesgcm" 
-    key:
-      secretKeyRef:
-        name: copybirdsecret
-        key: encryptionkey
-  # notifier:
-    # - type: stdout
+        key: secretaccesskey

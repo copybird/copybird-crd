@@ -18,15 +18,12 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"time"
 
-	"github.com/go-logr/logr"
 	backupv1alpha1 "github.com/copybird/copybird-crd/api/v1alpha1"
 	"github.com/copybird/copybird-crd/controllers/resources"
+	"github.com/go-logr/logr"
 	"k8s.io/api/batch/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,48 +105,13 @@ func (r *BackupReconciler) reconcile(ctx context.Context, backup *backupv1alpha1
 		copybirdImage = copybirdDefaultImage
 	}
 
-	backup.Status.Input.SecretProvided = true
-	backup.Status.Output.SecretProvided = true
-	backup.Status.EncryptionSecretProvided = true
+	backup.Status.Input.SecretsProvided = true
+	backup.Status.Output.SecretsProvided = true
+	backup.Status.Encrypt.SecretsProvided = true
+	backup.Status.Compress.SecretsProvided = true
 	backup.Status.LatestBackupHash = "unknown"
 
-	inputUser, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Database.User.SecretKeyRef)
-	if inputUser == "" || err != nil {
-		backup.Status.Input.SecretProvided = false
-	}
-	inputPassword, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Database.Password.SecretKeyRef)
-	if inputPassword == "" || err != nil {
-		backup.Status.Input.SecretProvided = false
-	}
-	outputAccessKey, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Storage.AccessKey.SecretKeyRef)
-	if outputAccessKey == "" || err != nil {
-		backup.Status.Output.SecretProvided = false
-	}
-	outputSecretKey, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Storage.SecretKey.SecretKeyRef)
-	if outputSecretKey == "" || err != nil {
-		backup.Status.Output.SecretProvided = false
-	}
-	encryptionKey, err := r.secretFrom(ctx, backup.Namespace, backup.Spec.Encryption.Key.SecretKeyRef)
-	if encryptionKey == "" || err != nil {
-		backup.Status.EncryptionSecretProvided = false
-	}
-
-	filename := r.composeFilename(backup)
-	input := r.composeInput(backup.Spec.Database, inputUser, inputPassword)
-	encryption := r.composeEncryption(backup.Spec.Encryption.Type, encryptionKey)
-	compression := r.composeCompression(backup.Spec.CompressionLevel)
-	output := r.composeOutput(backup.Spec.Storage, filename, outputAccessKey, outputSecretKey)
-
-	copybird := resources.NewCopyBirdParams(
-		backup.Name,
-		backup.Namespace,
-		copybirdImage,
-		backup.Spec.Schedule,
-		input,
-		compression,
-		encryption,
-		output,
-	)
+	copybird := resources.NewCopyBirdParams(copybirdImage, backup)
 
 	cronjob := &v1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -158,7 +120,7 @@ func (r *BackupReconciler) reconcile(ctx context.Context, backup *backupv1alpha1
 		},
 	}
 
-	err = r.Get(ctx, client.ObjectKey{Namespace: cronjob.Namespace, Name: cronjob.Name}, cronjob)
+	err := r.Get(ctx, client.ObjectKey{Namespace: cronjob.Namespace, Name: cronjob.Name}, cronjob)
 	if apierrors.IsNotFound(err) {
 		cronjob = copybird.MakeCronJob(ctx)
 	} else if err != nil {
@@ -190,67 +152,6 @@ func (r *BackupReconciler) finalize(ctx context.Context, backup *backupv1alpha1.
 	finalizers.Delete(finalizerName)
 	backup.Finalizers = finalizers.List()
 	return nil
-}
-
-func (r *BackupReconciler) secretFrom(ctx context.Context, namespace string, secretKeySelector *corev1.SecretKeySelector) (string, error) {
-	if secretKeySelector == nil {
-		return "", nil
-	}
-	secret := &corev1.Secret{}
-	err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretKeySelector.Name}, secret)
-	if err != nil {
-		return "", err
-	}
-	secretVal, ok := secret.Data[secretKeySelector.Key]
-	if !ok {
-		return "", fmt.Errorf(`key "%s" not found in secret "%s"`, secretKeySelector.Key, secretKeySelector.Name)
-	}
-	return string(secretVal), nil
-}
-
-func (r *BackupReconciler) composeFilename(backup *backupv1alpha1.Backup) string {
-	filename := fmt.Sprintf("%s-%s-%d", backup.Spec.Database.Type, backup.Spec.Database.Name, time.Now().Unix())
-	if backup.Spec.Encryption.Type != "" {
-		filename = fmt.Sprintf("%s-encrypted", filename)
-	}
-	if backup.Spec.CompressionLevel > 0 {
-		return fmt.Sprintf("%s.%s", filename, compressionType)
-	}
-	return fmt.Sprintf("%s.sql", filename)
-}
-
-func (r *BackupReconciler) composeInput(db backupv1alpha1.Database, user, password string) string {
-	return fmt.Sprintf("%s::dsn=%s:%s@tcp(%s)/%s", db.Type, user, password, db.Host, db.Name)
-}
-
-func (r *BackupReconciler) composeOutput(storage backupv1alpha1.BackupStorage, filename, accessKey, secretKey string) string {
-	return fmt.Sprintf("%s::region=%s::access_key_id=%s::secret_access_key=%s::bucket=%s::file_name=%s",
-		storage.Type, storage.Region, accessKey, secretKey, storage.Bucket, filename)
-}
-
-func (r *BackupReconciler) composeCompression(compressionLevel int) string {
-	if compressionLevel == 0 {
-		return ""
-	}
-	return fmt.Sprintf("%s::level=%d", compressionType, compressionLevel)
-}
-
-func (r *BackupReconciler) composeEncryption(algorithm, encryptionKey string) string {
-	if encryptionKey == "" {
-		return ""
-	}
-	l := len(encryptionKey)
-	if l < 16 {
-		encryptionKey = fmt.Sprintf("%016v", encryptionKey)
-	} else if l < 24 {
-		encryptionKey = fmt.Sprintf("%024v", encryptionKey)
-	} else if l < 32 {
-		encryptionKey = fmt.Sprintf("%032v", encryptionKey)
-	} else if l > 32 {
-		encryptionKey = encryptionKey[:31]
-	}
-
-	return fmt.Sprintf("%s::key=%x", algorithm, encryptionKey)
 }
 
 func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {

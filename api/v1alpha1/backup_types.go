@@ -34,60 +34,44 @@ type Backup struct {
 
 // BackupSpec defines the desired state of Backup
 type BackupSpec struct {
-	Schedule         string           `json:"schedule,omitempty"`
-	StorePeriod      string           `json:"storeperiod,omitempty"`
-	CompressionLevel int              `json:"compressionlevel,omitempty"`
-	Database         Database         `json:"database,omitempty"`
-	Storage          BackupStorage    `json:"storage,omitempty"`
-	Encryption       BackupEncryption `json:"encryption,omitempty"`
+	Schedule string `json:"schedule,omitempty"`
+	Input    Module `json:"input,omitempty"`
+	Output   Module `json:"output,omitempty"`
+	Encrypt  Module `json:"encrypt,omitempty"`
+	Compress Module `json:"compress,omitempty"`
 }
 
-// Database contains  database host address, db name and access credentials
-type Database struct {
-	Type     string                `json:"type,omitempty"`
-	Host     string                `json:"host,omitempty"`
-	Name     string                `json:"name,omitempty"`
-	User     SecretValueFromSource `json:"user,omitempty"`
-	Password SecretValueFromSource `json:"password,omitempty"`
+// Module is a Copybird module representation
+type Module struct {
+	Type    string         `json:"type,omitempty"`
+	Params  []ModuleParam  `json:"params,omitempty"`
+	Secrets []ModuleSecret `json:"secrets,omitempty"`
 }
 
-// BackupStorage defines storage target where to store backup archives
-type BackupStorage struct {
-	Type      string                `json:"type,omitempty"`
-	Region    string                `json:"region,omitempty"`
-	Bucket    string                `json:"bucket,omitempty"`
-	AccessKey SecretValueFromSource `json:"accesskey,omitempty"`
-	SecretKey SecretValueFromSource `json:"secretkey,omitempty"`
+// ModuleParam contains key-value module parameter
+type ModuleParam struct {
+	Key   string `json:"key,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
-// BackupEncryption contains backup archive encryption parameters
-type BackupEncryption struct {
-	Type string                `json:"type,omitempty"`
-	Key  SecretValueFromSource `json:"key,omitempty"`
-}
-
-// SecretValueFromSource is a reference to Core secret object with key selector
-type SecretValueFromSource struct {
+// ModuleSecret contains a secret used by module
+type ModuleSecret struct {
 	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
-	LatestBackupHash         string       `json:"latestBackupHash,omitempty"`
-	LatestBackupTimestamp    string       `json:"latestBackupTimestamp,omitempty"`
-	EncryptionSecretProvided bool         `json:"encryptionSecretProvided"`
-	Input                    InputStatus  `json:"input"`
-	Output                   OutputStatus `json:"output"`
+	LatestBackupHash      string       `json:"latestBackupHash,omitempty"`
+	LatestBackupTimestamp string       `json:"latestBackupTimestamp,omitempty"`
+	Input                 ModuleStatus `json:"input"`
+	Output                ModuleStatus `json:"output"`
+	Compress              ModuleStatus `json:"compress"`
+	Encrypt               ModuleStatus `json:"compress"`
 }
 
-// InputStatus represents statuses of backup input component
-type InputStatus struct {
-	SecretProvided bool `json:"inputSecretProvided"`
-}
-
-// OutputStatus represents statuses of backup output component
-type OutputStatus struct {
-	SecretProvided bool `json:"OutputSecretProvided"`
+// ModuleStatus is a list of module statuses
+type ModuleStatus struct {
+	SecretsProvided bool `json:"secretsProvided"`
 }
 
 // +kubebuilder:object:root=true
