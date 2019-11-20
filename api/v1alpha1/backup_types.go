@@ -66,7 +66,7 @@ type BackupStatus struct {
 	Input                 ModuleStatus `json:"input"`
 	Output                ModuleStatus `json:"output"`
 	Compress              ModuleStatus `json:"compress"`
-	Encrypt               ModuleStatus `json:"compress"`
+	Encrypt               ModuleStatus `json:"encrypt"`
 }
 
 // ModuleStatus is a list of module statuses
