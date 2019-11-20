@@ -2,66 +2,82 @@ package resources
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	backupv1alpha1 "github.com/copybird/copybird-crd/api/v1alpha1"
 	v1 "k8s.io/api/batch/v1"
 	"k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	inputEnv    = "COPYBIRD_INPUT"
+	outputEnv   = "COPYBIRD_OUTPUT"
+	compressEnv = "COPYBIRD_COMPRESS"
+	encryptEnv  = "COPYBIRD_ENCRYPT"
+)
+
 type CopyBirdParams struct {
-	Name        string
-	Namespace   string
-	Image       string
-	Schedule    string
-	Input       string
-	Compression string
-	Encryption  string
-	Output      string
+	Image  string
+	Backup *backupv1alpha1.Backup
 }
 
-func NewCopyBirdParams(name, namespace, image, schedule, input, compression, encryption, output string) *CopyBirdParams {
+func NewCopyBirdParams(image string, backup *backupv1alpha1.Backup) *CopyBirdParams {
 	return &CopyBirdParams{
-		Name:        name,
-		Namespace:   namespace,
-		Image:       image,
-		Schedule:    schedule,
-		Input:       input,
-		Compression: compression,
-		Encryption:  encryption,
-		Output:      output,
+		Image:  image,
+		Backup: backup,
 	}
 }
 
 func (p *CopyBirdParams) MakeCronJob(ctx context.Context) *v1beta1.CronJob {
+	env := []corev1.EnvVar{
+		{
+			Name:  inputEnv,
+			Value: p.Backup.Spec.Input.Type,
+		}, {
+			Name:  outputEnv,
+			Value: p.Backup.Spec.Output.Type,
+		}, {
+			Name:  encryptEnv,
+			Value: p.Backup.Spec.Encrypt.Type,
+		}, {
+			Name:  compressEnv,
+			Value: p.Backup.Spec.Compress.Type,
+		},
+	}
+	env = append(env, parseParams(p.Backup.Spec.Input.Params, inputEnv)...)
+	env = append(env, parseSecrets(p.Backup.Spec.Input.Secrets, inputEnv)...)
+	env = append(env, parseParams(p.Backup.Spec.Output.Params, outputEnv)...)
+	env = append(env, parseSecrets(p.Backup.Spec.Output.Secrets, outputEnv)...)
+	env = append(env, parseParams(p.Backup.Spec.Compress.Params, compressEnv)...)
+	env = append(env, parseSecrets(p.Backup.Spec.Compress.Secrets, compressEnv)...)
+	env = append(env, parseParams(p.Backup.Spec.Encrypt.Params, encryptEnv)...)
+	env = append(env, parseSecrets(p.Backup.Spec.Encrypt.Secrets, encryptEnv)...)
 	return &v1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      p.Name,
-			Namespace: p.Namespace,
+			Name:      p.Backup.Name,
+			Namespace: p.Backup.Namespace,
 		},
 		Spec: v1beta1.CronJobSpec{
-			Schedule: p.Schedule,
+			Schedule: p.Backup.Spec.Schedule,
 			JobTemplate: v1beta1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: p.Name,
+					Name: p.Backup.Name,
 				},
 				Spec: v1.JobSpec{
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
-							Name: p.Name,
+							Name: p.Backup.Name,
 						},
 						Spec: corev1.PodSpec{
 							RestartPolicy: "OnFailure",
 							Containers: []corev1.Container{
 								corev1.Container{
-									Name:  p.Name,
+									Name:  p.Backup.Name,
 									Image: p.Image,
-									Env: []corev1.EnvVar{
-										{Name: "INPUT", Value: p.Input},
-										{Name: "OUTPUT", Value: p.Output},
-										{Name: "COMPRESSION", Value: p.Compression},
-										{Name: "ENCRYPTION", Value: p.Encryption},
-									},
+									Env:   env,
 								},
 							},
 						},
@@ -71,3 +87,45 @@ func (p *CopyBirdParams) MakeCronJob(ctx context.Context) *v1beta1.CronJob {
 		},
 	}
 }
+
+func parseParams(params []backupv1alpha1.ModuleParam, prefix string) []corev1.EnvVar {
+	var env []corev1.EnvVar
+	for _, v := range params {
+		env = append(env, corev1.EnvVar{
+			Name:  fmt.Sprintf("%s_%s", prefix, strings.ToUpper(v.Key)),
+			Value: v.Value,
+		})
+	}
+	return env
+}
+
+func parseSecrets(secrets []backupv1alpha1.ModuleSecret, prefix string) []corev1.EnvVar {
+	var env []corev1.EnvVar
+	for _, v := range secrets {
+		env = append(env, corev1.EnvVar{
+			Name: fmt.Sprintf("%s_%s", prefix, strings.ToUpper(v.SecretKeyRef.Key)),
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: v.SecretKeyRef,
+			},
+		})
+	}
+	return env
+}
+
+// func (r *BackupReconciler) composeEncryption(algorithm, encryptionKey string) string {
+// 	if encryptionKey == "" {
+// 		return ""
+// 	}
+// 	l := len(encryptionKey)
+// 	if l < 16 {
+// 		encryptionKey = fmt.Sprintf("%016v", encryptionKey)
+// 	} else if l < 24 {
+// 		encryptionKey = fmt.Sprintf("%024v", encryptionKey)
+// 	} else if l < 32 {
+// 		encryptionKey = fmt.Sprintf("%032v", encryptionKey)
+// 	} else if l > 32 {
+// 		encryptionKey = encryptionKey[:31]
+// 	}
+
+// 	return fmt.Sprintf("%s::key=%x", algorithm, encryptionKey)
+// }
