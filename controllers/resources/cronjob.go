@@ -77,6 +77,7 @@ func (p *CopyBirdParams) MakeCronJob(ctx context.Context) *v1beta1.CronJob {
 								corev1.Container{
 									Name:  p.Backup.Name,
 									Image: p.Image,
+									Args:  []string{"backup"},
 									Env:   env,
 								},
 							},
