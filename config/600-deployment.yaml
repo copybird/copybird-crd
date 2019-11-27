@@ -19,7 +19,7 @@ spec:
       - name: manager
         env:
         - name: COPYBIRD_IMAGE
-          value: copybird/copybird:latest
+          value: copybird/copybird:v0.2
           # value: github.com/copybird/copybird-crd/cmd/copybird-api
         image: github.com/copybird/copybird-crd/cmd/controller
         resources:
