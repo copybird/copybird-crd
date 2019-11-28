@@ -115,21 +115,3 @@ func parseSecrets(secrets []backupv1alpha1.ModuleSecret, prefix string) []corev1
 	}
 	return env
 }
-
-// func (r *BackupReconciler) composeEncryption(algorithm, encryptionKey string) string {
-// 	if encryptionKey == "" {
-// 		return ""
-// 	}
-// 	l := len(encryptionKey)
-// 	if l < 16 {
-// 		encryptionKey = fmt.Sprintf("%016v", encryptionKey)
-// 	} else if l < 24 {
-// 		encryptionKey = fmt.Sprintf("%024v", encryptionKey)
-// 	} else if l < 32 {
-// 		encryptionKey = fmt.Sprintf("%032v", encryptionKey)
-// 	} else if l > 32 {
-// 		encryptionKey = encryptionKey[:31]
-// 	}
-
-// 	return fmt.Sprintf("%s::key=%x", algorithm, encryptionKey)
-// }

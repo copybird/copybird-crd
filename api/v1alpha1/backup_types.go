@@ -61,17 +61,17 @@ type ModuleSecret struct {
 
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
-	LatestBackupHash      string       `json:"latestBackupHash,omitempty"`
+	CronjobName           string       `json:"cronjobName,omitempty"`
 	LatestBackupTimestamp string       `json:"latestBackupTimestamp,omitempty"`
-	Input                 ModuleStatus `json:"input"`
-	Output                ModuleStatus `json:"output"`
-	Compress              ModuleStatus `json:"compress"`
-	Encrypt               ModuleStatus `json:"encrypt"`
+	Input                 ModuleStatus `json:"input,omitempty"`
+	Output                ModuleStatus `json:"output,omitempty"`
+	Compress              ModuleStatus `json:"compress,omitempty"`
+	Encrypt               ModuleStatus `json:"encrypt,omitempty"`
 }
 
 // ModuleStatus is a list of module statuses
 type ModuleStatus struct {
-	SecretsProvided bool `json:"secretsProvided"`
+	// SecretsProvided bool `json:"secretsProvided"`
 }
 
 // +kubebuilder:object:root=true

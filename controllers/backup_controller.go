@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	backupv1alpha1 "github.com/copybird/copybird-crd/api/v1alpha1"
@@ -90,6 +91,11 @@ func (r *BackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		// return result, err
 	}
 
+	if err := r.Update(ctx, backup); err != nil {
+		log.Error(err, "Failed to update object")
+		return result, err
+	}
+
 	return result, nil
 }
 
@@ -105,20 +111,15 @@ func (r *BackupReconciler) reconcile(ctx context.Context, backup *backupv1alpha1
 		copybirdImage = copybirdDefaultImage
 	}
 
-	backup.Status.Input.SecretsProvided = true
-	backup.Status.Output.SecretsProvided = true
-	backup.Status.Encrypt.SecretsProvided = true
-	backup.Status.Compress.SecretsProvided = true
-	backup.Status.LatestBackupHash = "unknown"
-
 	copybird := resources.NewCopyBirdParams(copybirdImage, backup)
-
 	cronjob := &v1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backup.Name,
 			Namespace: backup.Namespace,
 		},
 	}
+
+	backup.Status.CronjobName = fmt.Sprintf("%s/%s", cronjob.Namespace, cronjob.Name)
 
 	err := r.Get(ctx, client.ObjectKey{Namespace: cronjob.Namespace, Name: cronjob.Name}, cronjob)
 	if apierrors.IsNotFound(err) {
