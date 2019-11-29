@@ -67,6 +67,14 @@ type BackupStatus struct {
 	Output                ModuleStatus `json:"output,omitempty"`
 	Compress              ModuleStatus `json:"compress,omitempty"`
 	Encrypt               ModuleStatus `json:"encrypt,omitempty"`
+	Jobs                  []JobStatus  `json:"jobs,omitempty"`
+}
+
+type JobStatus struct {
+	Name       string       `json:"name,omitempty"`
+	Success    bool         `json:"success"`
+	StartTime  *metav1.Time `json:"startTime,omitempty"`
+	FinishTime *metav1.Time `json:"finishTime,omitempty"`
 }
 
 // ModuleStatus is a list of module statuses

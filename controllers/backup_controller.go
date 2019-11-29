@@ -39,8 +39,6 @@ const (
 	finalizerName        = "copybird-backup-controller"
 	copybirdImageEnvVar  = "COPYBIRD_IMAGE"
 	copybirdDefaultImage = "copybird/copybird:latest"
-	// use hardcoded "gzip" compression for now
-	compressionType = "gzip"
 )
 
 // BackupReconciler reconciles a Backup object
@@ -87,12 +85,13 @@ func (r *BackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	if reconcileErr != nil {
 		result.Requeue = true
-		log.Error(reconcileErr, "reconcilation error")
-		// return result, err
+		log.Info("reconcilation error", "reason", reconcileErr)
+		return result, err
 	}
 
 	if err := r.Update(ctx, backup); err != nil {
-		log.Error(err, "Failed to update object")
+		result.Requeue = true
+		log.Info("failed to update object", "reason", err)
 		return result, err
 	}
 
